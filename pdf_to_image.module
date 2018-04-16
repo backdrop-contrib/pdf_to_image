@@ -1,0 +1,230 @@
+<?php
+/**
+ * Create images from one-or-more pages of a PDF file.
+ */
+
+/**
+ * Implements hook_form_FORM_ID_alter() for field_ui_field_edit_form.
+ */
+function pdf_to_image_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
+  $instance = $form['#instance'];
+
+  // Add settings to just the generic File widget.
+  if ($instance['widget']['type'] != 'file_generic') {
+    return;
+  }
+
+  // Get default values.
+  if (isset($instance['settings']['pdf_to_image'])) {
+    $defaults = $instance['settings']['pdf_to_image'];
+  }
+  else {
+    $defaults = array(
+      'image_field' => '',
+      'hide_image_field' => FALSE,
+      'format' => 'jpg',
+      'options' => array(
+        'resolution' => 100,
+        'trim' => FALSE,
+      ),
+    );
+  }
+
+  // Get image fields on this entity as options for the select field.
+  $options = array();
+  $fields = field_info_instances($instance['entity_type'], $instance['bundle']);
+  foreach ($fields as $field) {
+    $field_info = field_info_field($field['field_name']);
+    if ($field_info['type'] == 'image') {
+      $options[$field['field_name']] = $field['label'];
+    }
+  }
+
+  // Display certain fields only when an image field has been selected.
+  $states = array(
+    'invisible' => array(
+      ':input[name$="[pdf_to_image][image_field]"]' => array('value' => ''),
+    ),
+  );
+
+  // Add our settings.
+  $form['instance']['settings']['pdf_to_image'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('PDF to image'),
+    '#description' => t("When an image field is selected below, the PDF file uploaded to this field will have images of its page(s) saved to that image field. The number of images saved will be either: the number of pages in the PDF file, or the 'Number of values' allowed for the selected image field (whichever is less).<br>Note that if this is a multi-valued field (determined by the 'Number of values' global setting below) only the first file will be processed, assuming it's a PDF file. Processing multiple PDF files from the same field is not supported."),
+  );
+  $form['instance']['settings']['pdf_to_image']['image_field'] = array(
+    '#type' => 'select',
+    '#title' => t('Image field'),
+    '#description' => t("The field where this file's image(s) will be saved."),
+    '#options' => $options,
+    '#default_value' => $defaults['image_field'],
+    '#empty_option' => '- ' . t('Disabled') . ' -',
+  );
+  $form['instance']['settings']['pdf_to_image']['hide_image_field'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Hide image field'),
+    '#description' => t("Hide the image field from edit forms so that images can't be manually uploaded there."),
+    '#default_value' => $defaults['hide_image_field'],
+    '#states' => $states,
+  );
+  $form['instance']['settings']['pdf_to_image']['format'] = array(
+    '#type' => 'select',
+    '#title' => t('Image format'),
+    '#description' => t("The file format to save this file's image(s) as. The image field must list the selected format in its 'Allowed file extensions' setting."),
+    '#options' => array(
+      'jpg' => 'JPG',
+      'gif' => 'GIF',
+      'png' => 'PNG',
+    ),
+    '#default_value' => $defaults['format'],
+    '#states' => $states,
+  );
+  $form['instance']['settings']['pdf_to_image']['options'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Options'),
+    '#collapsible' => TRUE,
+    '#states' => $states,
+  );
+  $form['instance']['settings']['pdf_to_image']['options']['resolution'] = array(
+    '#type' => 'number',
+    '#title' => t('Resolution'),
+    '#description' => t("The resolution of this file's image(s). NOTE: This is <em>not</em> the image dimensions, but rather a factor by which the image dimensions are calculated (e.g. a resolution of '150' means a PDF page measuring 8x12 inches will produce image dimensions of 1200x1800 pixels)."),
+    '#default_value' => $defaults['options']['resolution'],
+    '#min' => 1,
+    '#max' => 1000,
+  );
+  $form['instance']['settings']['pdf_to_image']['options']['trim'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Trim'),
+    '#description' => t("Crop the edges of the image that are the same color as the background."),
+    '#default_value' => $defaults['options']['trim'],
+  );
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function pdf_to_image_form_alter(&$form, &$form_state, $form_id) {
+  // Run only on entity edit forms.
+  if (!(isset($form['#entity_type']) && isset($form['#bundle']))) {
+    return;
+  }
+
+  // Get PDF to Image-enabled fields.
+  $file_fields = _pdf_to_image_get_fields($form['#entity_type'], $form['#bundle']);
+
+  // Hide image fields.
+  if (!empty($file_fields)) {
+    foreach ($file_fields as $file_field) {
+      if ($file_field['settings']['pdf_to_image']['hide_image_field']) {
+        $image_field = $file_field['settings']['pdf_to_image']['image_field'];
+        if (isset($form[$image_field])) {
+          $form[$image_field]['#access'] = FALSE;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_entity_presave().
+ */
+function pdf_to_image_entity_presave($entity, $type) {
+  // Get the entity bundle.
+  list($id, $vid, $bundle) = entity_extract_ids($type, $entity);
+
+  // Get PDF to Image-enabled fields.
+  $file_fields = _pdf_to_image_get_fields($type, $bundle);
+  if (empty($file_fields)) {
+    return;
+  }
+
+  foreach ($file_fields as $file_field) {
+    $settings = $file_field['settings']['pdf_to_image'];
+    $image_field = $settings['image_field'];
+
+    // Get the old and new file for this field and its associated image field.
+    $old_files = array();
+    $old_images = array();
+    if (!empty($entity->original)) {
+      $old_files = field_get_items($type, $entity->original, $file_field['field_name']);
+      $old_images = field_get_items($type, $entity->original, $image_field);
+    }
+    $new_files = field_get_items($type, $entity, $file_field['field_name']);
+    $new_images = field_get_items($type, $entity, $image_field);
+
+    // If there are no files here, clear the associated image field and move on.
+    if (empty($new_files)) {
+      $entity->{$image_field}[$entity->langcode] = array();
+      continue;
+    }
+
+    // Only process the first file in a multi-valued field, and make sure it's a
+    // PDF file.
+    $file = file_load($new_files[0]['fid']);
+    if ($file->filemime != 'application/pdf') {
+      continue;
+    }
+
+    // Check if this file already exists and, if so, move on.
+    if (!empty($old_files) && $file->fid == $old_files[0]['fid'] && !empty($new_images)) {
+      continue;
+    }
+
+    // If image(s) have been manually uploaded, don't overwrite them, move on.
+    if (empty($old_images) && !empty($new_images)) {
+      continue;
+    }
+
+    // Clear the associated image field.
+    $entity->{$image_field}[$entity->langcode] = array();
+
+    // Process the PDF file.
+    $imagick = new imagick();
+    $imagick->setResolution($settings['options']['resolution'], $settings['options']['resolution']);
+    $imagick->readImage($file->uri);
+    $imagick->setImageFormat($settings['format']);
+    $total = $imagick->getNumberImages();
+    for ($page = 0; $page < $total; $page++) {
+      $imagick->setIteratorIndex($page);
+      if ($settings['options']['trim']) {
+        $imagick->trimImage(0);
+      }
+
+      // Get the temporary and final destinations for this image.
+      $filename = pathinfo($file->uri, PATHINFO_FILENAME) . '-' . $page . '.' . $settings['format'];
+      $temp_destination = file_directory_temp() . '/' . $filename;
+      $final_destination = file_field_widget_uri(field_info_field($file_field['field_name']), $file_field) . $filename;
+
+      // Save the image.
+      $imagick->writeImage($temp_destination);
+      $data = file_get_contents($temp_destination);
+      $image = file_save_data($data, $final_destination, FILE_EXISTS_REPLACE);
+      $entity->{$image_field}[$entity->langcode][] = (array) $image;
+    }
+    $imagick->clear();
+  }
+}
+
+/**
+ * Get a list of PDF to Image-enabled fields.
+ *
+ * @param $entity_type
+ *   The entity type for which to return fields (e.g. 'node' or 'user').
+ * @param $bundle
+ *   The bundle name for which to return fields.
+ */
+function _pdf_to_image_get_fields($entity_type, $bundle) {
+  $file_fields = array();
+
+  $fields = field_info_instances($entity_type, $bundle);
+  foreach ($fields as $field) {
+    if ($field['widget']['type'] == 'file_generic' && !empty($field['settings']['pdf_to_image']['image_field'])) {
+      $file_fields[$field['field_name']] = $field;
+    }
+  }
+
+  return $file_fields;
+}
+

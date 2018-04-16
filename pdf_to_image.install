@@ -1,0 +1,47 @@
+<?php
+/**
+ * @file
+ * Install, update and uninstall functions for the PDF to Image module.
+ */
+
+/**
+ * Implements hook_requirements().
+ */
+function pdf_to_image_requirements($phase) {
+  $t = get_t();
+  $requirements = array();
+
+  if ($phase == 'runtime') {
+    $requirements['pdf_to_image'] = array(
+      'title' => $t('Imagick'),
+    );
+    if (!extension_loaded('imagick')) {
+      $requirements['pdf_to_image']['value'] = $t('Not enabled');
+      $requirements['pdf_to_image']['description'] = $t("PDF to Image requires that you enable the 'Imagick' PHP extension. Please see the README file for details.");
+      $requirements['pdf_to_image']['severity'] = REQUIREMENT_ERROR;
+    }
+    else {
+      $requirements['pdf_to_image']['value'] = $t('Enabled');
+      $requirements['pdf_to_image']['severity'] = REQUIREMENT_OK;
+    }
+  }
+
+  return $requirements;
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function pdf_to_image_uninstall() {
+  // Remove our settings from field instance config files.
+  foreach (field_info_instances() as $entity_type) {
+    foreach ($entity_type as $bundle) {
+      foreach ($bundle as $field) {
+        if ($field['widget']['type'] == 'file_generic') {
+          config_clear('field.instance.' . $field['entity_type'] . '.' . $field['bundle'] . '.' . $field['field_name'], 'settings.pdf_to_image');
+        }
+      }
+    }
+  }
+}
+

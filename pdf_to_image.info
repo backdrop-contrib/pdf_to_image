@@ -1,0 +1,6 @@
+name = PDF to Image
+description = Create images from one-or-more pages of a PDF file.
+backdrop = 1.x
+type = module
+dependencies[] = image
+
