@@ -216,7 +216,10 @@ function pdf_to_image_entity_presave($entity, $entity_type) {
 
       // use the configured directory of the imagefield as destination
       $image_field_instance = field_info_instance($entity_type, $image_field, $bundle);
-      $final_destination = file_field_widget_uri($image_field_info, $image_field_instance) . '/' . $filename;
+      $image_dir_uri = file_field_widget_uri($image_field_info, $image_field_instance);
+      // create directory if not exists
+      file_prepare_directory($image_dir_uri, FILE_CREATE_DIRECTORY);
+      $final_destination = $image_dir_uri  . '/' . $filename;
 
       // Save the image.
       $imagick->writeImage($temp_destination);
