@@ -223,7 +223,7 @@ function pdf_to_image_entity_presave($entity, $entity_type) {
       if(substr($image_dir_uri, -1) != '/') {
         $image_dir_uri .= '/';
       }
-      $final_destination = $image_dir_uri  . $filename;
+      $final_destination = $image_dir_uri . $filename;
 
       // Save the image.
       $imagick->writeImage($temp_destination);
