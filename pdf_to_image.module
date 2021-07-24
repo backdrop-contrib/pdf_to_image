@@ -130,12 +130,12 @@ function pdf_to_image_form_alter(&$form, &$form_state, $form_id) {
 /**
  * Implements hook_entity_presave().
  */
-function pdf_to_image_entity_presave($entity, $entity_type) {
+function pdf_to_image_entity_presave($entity, $type) {
   // Get the entity bundle.
-  list($id, $vid, $bundle) = entity_extract_ids($entity_type, $entity);
+  list($id, $vid, $bundle) = entity_extract_ids($type, $entity);
 
   // Get PDF to Image-enabled fields.
-  $file_fields = _pdf_to_image_get_fields($entity_type, $bundle);
+  $file_fields = _pdf_to_image_get_fields($type, $bundle);
   if (empty($file_fields)) {
     return;
   }
@@ -148,11 +148,11 @@ function pdf_to_image_entity_presave($entity, $entity_type) {
     $old_files = array();
     $old_images = array();
     if (!empty($entity->original)) {
-      $old_files = field_get_items($entity_type, $entity->original, $file_field['field_name']);
-      $old_images = field_get_items($entity_type, $entity->original, $image_field);
+      $old_files = field_get_items($type, $entity->original, $file_field['field_name']);
+      $old_images = field_get_items($type, $entity->original, $image_field);
     }
-    $new_files = field_get_items($entity_type, $entity, $file_field['field_name']);
-    $new_images = field_get_items($entity_type, $entity, $image_field);
+    $new_files = field_get_items($type, $entity, $file_field['field_name']);
+    $new_images = field_get_items($type, $entity, $image_field);
 
     // If there are no files here, clear the associated image field and move on.
     if (empty($new_files)) {
@@ -180,25 +180,19 @@ function pdf_to_image_entity_presave($entity, $entity_type) {
     // Clear the associated image field.
     $entity->{$image_field}[$entity->langcode] = array();
 
+    // Let the configured number of imagefield items determine the number of generated images
+    $image_field_info = field_info_field($image_field);
+    $cardinality = $image_field_info['cardinality'];
+
     // Process the PDF file.
     $imagick = new imagick();
     $imagick->setResolution($settings['options']['resolution'], $settings['options']['resolution']);
-    
+
     $imagick->readImage($file->uri);
     $imagick->setImageFormat($settings['format']);
     $total = $imagick->getNumberImages();
 
-    // let the configured number of imagefield items determine the number of generated images
-    $image_field_info = field_info_field($image_field);
-    $cardinality = $image_field_info['cardinality'];
-
-    // Prepare count parameter.
-    if ($cardinality != -1 && $total > $cardinality) {
-      $count = $cardinality;
-    }
-    else {
-      $count = $total;
-    }
+    $count = ($cardinality != -1 && $total > $cardinality) ? $cardinality : $total;
 
     for ($page = 0; $page < $count; $page++) {
       $imagick->setIteratorIndex($page);
@@ -210,9 +204,16 @@ function pdf_to_image_entity_presave($entity, $entity_type) {
       $filename = pathinfo($file->uri, PATHINFO_FILENAME) . '-' . $page . '.' . $settings['format'];
       $temp_destination = file_directory_temp() . '/' . $filename;
 
-      // use the configured directory of the imagefield as destination
-      $image_field_instance = field_info_instance($entity_type, $image_field, $bundle);
-      $final_destination = file_field_widget_uri($image_field_info, $image_field_instance) . '/' . $filename;
+      // Use the configured directory of the imagefield as destination.
+      $image_field_instance = field_info_instance($type, $image_field, $bundle);
+      $image_dir_uri = file_field_widget_uri($image_field_info, $image_field_instance);
+      // Create directory on the first run
+      file_prepare_directory($image_dir_uri, FILE_CREATE_DIRECTORY);
+      // Avoid adding a third slash if it's the files root directory identified by 'public://'.
+      if(substr($image_dir_uri, -1) != '/') {
+        $image_dir_uri .= '/';
+      }
+      $final_destination = $image_dir_uri . $filename;
 
       // Save the image.
       $imagick->writeImage($temp_destination);
