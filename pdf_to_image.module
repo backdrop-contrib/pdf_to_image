@@ -183,6 +183,10 @@ function pdf_to_image_entity_presave($entity, $type) {
     // Process the PDF file.
     $imagick = new imagick();
     $imagick->setResolution($settings['options']['resolution'], $settings['options']['resolution']);
+
+    // Without this configuration the colors in the generated images were slightly shifted
+    $imagick->SetColorspace(Imagick::COLORSPACE_SRGB);
+
     $imagick->readImage($file->uri);
     $imagick->setImageFormat($settings['format']);
     $total = $imagick->getNumberImages();
