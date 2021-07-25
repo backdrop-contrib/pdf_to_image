@@ -180,13 +180,21 @@ function pdf_to_image_entity_presave($entity, $type) {
     // Clear the associated image field.
     $entity->{$image_field}[$entity->langcode] = array();
 
+    // Get the field array of the image field
+    $image_field_info = field_info_field($image_field);
+
     // Process the PDF file.
     $imagick = new imagick();
     $imagick->setResolution($settings['options']['resolution'], $settings['options']['resolution']);
     $imagick->readImage($file->uri);
     $imagick->setImageFormat($settings['format']);
     $total = $imagick->getNumberImages();
-    for ($page = 0; $page < $total; $page++) {
+
+    // Let the configured number of image field items (cardinality) limit the number of generated images.
+    $cardinality = $image_field_info['cardinality'];
+    $count = ($cardinality != -1 && $total > $cardinality) ? $cardinality : $total;
+
+    for ($page = 0; $page < $count; $page++) {
       $imagick->setIteratorIndex($page);
       if ($settings['options']['trim']) {
         $imagick->trimImage(0);
