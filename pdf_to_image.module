@@ -180,7 +180,7 @@ function pdf_to_image_entity_presave($entity, $type) {
     // Clear the associated image field.
     $entity->{$image_field}[$entity->langcode] = array();
 
-    // Get the field array of the image field
+    // Get the field array of the image field.
     $image_field_info = field_info_field($image_field);
 
     // Process the PDF file.
