@@ -189,7 +189,7 @@ function pdf_to_image_entity_presave($entity, $type) {
 
     $imagick->readImage($file->uri);
 
-    // This ensures that the created image has no transparent areas through which a random background color could bleed through.
+    // This ensures that the created image has no transparent areas a random background color could bleed through.
     $imagick->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
     $imagick->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
 
