@@ -188,6 +188,11 @@ function pdf_to_image_entity_presave($entity, $type) {
     $imagick->SetColorspace(Imagick::COLORSPACE_SRGB);
 
     $imagick->readImage($file->uri);
+
+    // This ensures that the created image has no transparent areas through which a random background color could bleed through
+    $imagick->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
+    $imagick->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
+
     $imagick->setImageFormat($settings['format']);
     $total = $imagick->getNumberImages();
     for ($page = 0; $page < $total; $page++) {
