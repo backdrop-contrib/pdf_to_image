@@ -184,12 +184,14 @@ function pdf_to_image_entity_presave($entity, $type) {
     $imagick = new imagick();
     $imagick->setResolution($settings['options']['resolution'], $settings['options']['resolution']);
 
-    // Without this configuration the colors in the generated images were slightly shifted
+    // Set color space to the most compatible one (esp. for displays)
+    // to avoid color shifting.
     $imagick->SetColorspace(Imagick::COLORSPACE_SRGB);
 
     $imagick->readImage($file->uri);
 
-    // This ensures that the created image has no transparent areas a random background color could bleed through.
+    // Ensure the created images have no transparent areas
+    // to avoid background colors bleeding through.
     $imagick->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
     $imagick->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
 
