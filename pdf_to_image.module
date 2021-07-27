@@ -190,10 +190,12 @@ function pdf_to_image_entity_presave($entity, $type) {
 
     $imagick->readImage($file->uri);
 
-    // Ensure the created images have no transparent areas
-    // to avoid background colors bleeding through.
-    $imagick->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
-    $imagick->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
+    // Avoid background of JPG-files being coincidentally converted to black
+    // due to possible error of Imagemagick.
+    if ($settings['format'] == 'jpg') {
+      $imagick->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
+      $imagick->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
+    }
 
     $imagick->setImageFormat($settings['format']);
     $total = $imagick->getNumberImages();
