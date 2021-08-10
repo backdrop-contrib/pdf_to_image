@@ -180,6 +180,9 @@ function pdf_to_image_entity_presave($entity, $type) {
     // Clear the associated image field.
     $entity->{$image_field}[$entity->langcode] = array();
 
+    // Get the field array of the image field.
+    $image_field_info = field_info_field($image_field);
+
     // Process the PDF file.
     $imagick = new imagick();
     $imagick->setResolution($settings['options']['resolution'], $settings['options']['resolution']);
@@ -195,7 +198,17 @@ function pdf_to_image_entity_presave($entity, $type) {
       // Get the temporary and final destinations for this image.
       $filename = pathinfo($file->uri, PATHINFO_FILENAME) . '-' . $page . '.' . $settings['format'];
       $temp_destination = file_directory_temp() . '/' . $filename;
-      $final_destination = file_field_widget_uri(field_info_field($file_field['field_name']), $file_field) . $filename;
+
+      // Use the configured directory of the imagefield as destination.
+      $image_field_instance = field_info_instance($type, $image_field, $bundle);
+      $image_dir_uri = file_field_widget_uri($image_field_info, $image_field_instance);
+      // Create directory on the first run
+      file_prepare_directory($image_dir_uri, FILE_CREATE_DIRECTORY);
+      // Avoid adding a third slash if it's the files root directory identified by 'public://'.
+      if(substr($image_dir_uri, -1) != '/') {
+        $image_dir_uri .= '/';
+      }
+      $final_destination = $image_dir_uri . $filename;
 
       // Save the image.
       $imagick->writeImage($temp_destination);
