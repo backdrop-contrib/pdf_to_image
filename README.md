@@ -50,13 +50,14 @@ https://github.com/backdrop-contrib/pdf_to_image/issues.
 Current Maintainers
 -------------------
 
-- Peter Anderson (https://github.com/BWPanda).
+- Looking for maintainer(s).
 
 Credits
 -------
 
-- Inspired by Drupal's 'PDF to Imagefield' module
-  (https://www.drupal.org/project/pdf_to_imagefield).
+- Written for Backdrop by [Peter Anderson](https://github.com/BWPanda).
+- Inspired by Drupal's '[PDF to Imagefield](https://www.drupal.org/project/pdf_to_imagefield)'
+  module.
 
 License
 -------
