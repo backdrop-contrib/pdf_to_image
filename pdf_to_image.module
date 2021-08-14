@@ -183,7 +183,20 @@ function pdf_to_image_entity_presave($entity, $type) {
     // Process the PDF file.
     $imagick = new imagick();
     $imagick->setResolution($settings['options']['resolution'], $settings['options']['resolution']);
+
+    // Set color space to the most compatible one (esp. for displays)
+    // to avoid color shifting.
+    $imagick->SetColorspace(Imagick::COLORSPACE_SRGB);
+
     $imagick->readImage($file->uri);
+
+    // Avoid background of JPG-files being coincidentally converted to black
+    // due to possible error of Imagemagick.
+    if ($settings['format'] == 'jpg') {
+      $imagick->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
+      $imagick->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
+    }
+
     $imagick->setImageFormat($settings['format']);
     $total = $imagick->getNumberImages();
     for ($page = 0; $page < $total; $page++) {
