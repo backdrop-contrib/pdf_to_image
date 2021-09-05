@@ -50,7 +50,7 @@ https://github.com/backdrop-contrib/pdf_to_image/issues.
 Current Maintainers
 -------------------
 
-- Looking for maintainer(s).
+- Alexander Wanke (https://github.com/a8w4)
 
 Credits
 -------
