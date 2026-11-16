@@ -1,6 +1,5 @@
 name = PDF to Image
-description = Create images from one-or-more pages of a PDF file.
+description = Create images from PDF pages with configurable alt-text generation
 backdrop = 1.x
 type = module
 dependencies[] = image
-
